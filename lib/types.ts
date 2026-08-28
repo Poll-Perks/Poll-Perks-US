@@ -33,3 +33,11 @@ export interface NewListingInput {
   rules: string;
   contactEmail: string;
 }
+export const CATEGORIES: Category[] = [
+  "Food & Drink",
+  "Retail",
+  "Services",
+  "Entertainment",
+  "Health & Wellness",
+  "Home & Auto",
+];
