@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Header from "@/components/Header";
+import HomeExplainer from "@/components/HomeExplainer";
 import CategoryChips from "@/components/CategoryChips";
 import OfferCard from "@/components/OfferCard";
 import { getApprovedListings } from "@/lib/data";
@@ -52,8 +53,9 @@ export default function BrowsePage({
   return (
     <main className="min-h-screen bg-paper">
       <Header />
+      <HomeExplainer />
 
-      <div className="border-b border-line px-6 py-6 md:px-12">
+      <div id="offers" className="border-b border-line px-6 py-6 md:px-12 scroll-mt-6">
         <p className="mb-3 font-mono text-[11.5px] uppercase tracking-wide text-[#7c8494]">Browsing offers in</p>
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-[160px] rounded-lg border border-line bg-raised px-3.5 py-2.5 text-sm font-medium">
