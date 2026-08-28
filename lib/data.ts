@@ -1,6 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { Listing, NewListingInput, Category } from "./types";
+import { CATEGORIES } from "./types";
+
+export { CATEGORIES };
 
 // --- Data layer -------------------------------------------------------
 // Everything below reads and writes a single JSON file (data/seed.json)
@@ -37,15 +40,6 @@ function slugify(business: string): string {
     .replace(/(^-|-$)/g, "");
   return `${base}-${Date.now().toString(36)}`;
 }
-
-export const CATEGORIES: Category[] = [
-  "Food & Drink",
-  "Retail",
-  "Services",
-  "Entertainment",
-  "Health & Wellness",
-  "Home & Auto",
-];
 
 export async function getApprovedListings(filters?: {
   state?: string;
