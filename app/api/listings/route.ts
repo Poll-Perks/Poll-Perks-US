@@ -19,16 +19,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Missing fields: ${missing.join(", ")}` }, { status: 400 });
   }
 
-  const listing = await createListing({
-    business: body.business!,
-    address: body.address!,
-    county: body.county!,
-    state: body.state!,
-    category: body.category!,
-    offer: body.offer!,
-    rules: body.rules ?? "",
-    contactEmail: body.contactEmail!,
-  });
+  try {
+    const listing = await createListing({
+      business: body.business!,
+      address: body.address!,
+      county: body.county!,
+      state: body.state!,
+      category: body.category!,
+      offer: body.offer!,
+      rules: body.rules ?? "",
+      contactEmail: body.contactEmail!,
+    });
 
-  return NextResponse.json({ listing }, { status: 201 });
+    return NextResponse.json({ listing }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("POST /api/listings failed:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
