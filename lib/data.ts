@@ -1,35 +1,39 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { supabase } from "./supabase";
 import type { Listing, NewListingInput, Category } from "./types";
 import { CATEGORIES } from "./types";
 
 export { CATEGORIES };
 
-// --- Data layer -------------------------------------------------------
-// Everything below reads and writes a single JSON file (data/seed.json)
-// so the app runs with zero setup and zero cost. It's a stand-in for a
-// real database, not a design decision: every function here has a
-// narrow, obvious job, so swapping the body of each one for a Supabase
-// query later is a small, mechanical change — nothing that calls these
-// functions (the pages, the API routes) needs to change at all.
-//
-// Known limitation: writing to a JSON file only works reliably on a
-// single, persistent server (e.g. `npm run dev`, or a traditional
-// Node host). It will NOT persist writes on Vercel's serverless
-// functions, because each request can run on a fresh, read-only
-// filesystem. That's the trigger to do the Supabase swap described in
-// the README — this file is deliberately structured to make that swap
-// easy, not to be a permanent database.
-
-const DATA_FILE = path.join(process.cwd(), "data", "seed.json");
-
-async function readAll(): Promise<Listing[]> {
-  const raw = await fs.readFile(DATA_FILE, "utf-8");
-  return JSON.parse(raw) as Listing[];
+interface ListingRow {
+  id: string;
+  business: string;
+  address: string;
+  county: string;
+  state: string;
+  category: string;
+  offer: string;
+  rules: string;
+  contact_email: string;
+  status: Listing["status"];
+  submitted_at: string;
+  reviewed_at: string | null;
 }
 
-async function writeAll(listings: Listing[]): Promise<void> {
-  await fs.writeFile(DATA_FILE, JSON.stringify(listings, null, 2) + "\n", "utf-8");
+function rowToListing(row: ListingRow): Listing {
+  return {
+    id: row.id,
+    business: row.business,
+    address: row.address,
+    county: row.county,
+    state: row.state,
+    category: row.category as Category,
+    offer: row.offer,
+    rules: row.rules,
+    contactEmail: row.contact_email,
+    status: row.status,
+    submittedAt: row.submitted_at,
+    reviewedAt: row.reviewed_at ?? undefined,
+  };
 }
 
 function slugify(business: string): string {
@@ -46,47 +50,60 @@ export async function getApprovedListings(filters?: {
   county?: string;
   category?: Category | "All";
 }): Promise<Listing[]> {
-  const all = await readAll();
-  return all.filter((listing) => {
-    if (listing.status !== "approved") return false;
-    if (filters?.state && listing.state !== filters.state) return false;
-    if (filters?.county && listing.county !== filters.county) return false;
-    if (filters?.category && filters.category !== "All" && listing.category !== filters.category) return false;
-    return true;
-  });
+  let query = supabase.from("listings").select("*").eq("status", "approved");
+
+  if (filters?.state) query = query.eq("state", filters.state);
+  if (filters?.county) query = query.eq("county", filters.county);
+  if (filters?.category && filters.category !== "All") query = query.eq("category", filters.category);
+
+  const { data, error } = await query.order("submitted_at", { ascending: false });
+  if (error) throw new Error(`Failed to load offers: ${error.message}`);
+  return (data as ListingRow[]).map(rowToListing);
 }
 
 export async function getListingById(id: string): Promise<Listing | undefined> {
-  const all = await readAll();
-  return all.find((listing) => listing.id === id);
+  const { data, error } = await supabase.from("listings").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`Failed to load listing: ${error.message}`);
+  return data ? rowToListing(data as ListingRow) : undefined;
 }
 
 export async function getPendingListings(): Promise<Listing[]> {
-  const all = await readAll();
-  return all
-    .filter((listing) => listing.status === "pending")
-    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("status", "pending")
+    .order("submitted_at", { ascending: false });
+  if (error) throw new Error(`Failed to load pending listings: ${error.message}`);
+  return (data as ListingRow[]).map(rowToListing);
 }
 
 export async function createListing(input: NewListingInput): Promise<Listing> {
-  const all = await readAll();
-  const listing: Listing = {
-    ...input,
+  const row = {
     id: slugify(input.business),
-    status: "pending",
-    submittedAt: new Date().toISOString(),
+    business: input.business,
+    address: input.address,
+    county: input.county,
+    state: input.state,
+    category: input.category,
+    offer: input.offer,
+    rules: input.rules,
+    contact_email: input.contactEmail,
+    status: "pending" as const,
+    submitted_at: new Date().toISOString(),
   };
-  all.push(listing);
-  await writeAll(all);
-  return listing;
+
+  const { data, error } = await supabase.from("listings").insert(row).select().single();
+  if (error) throw new Error(`Failed to create listing: ${error.message}`);
+  return rowToListing(data as ListingRow);
 }
 
 export async function reviewListing(id: string, decision: "approved" | "rejected"): Promise<Listing | undefined> {
-  const all = await readAll();
-  const listing = all.find((l) => l.id === id);
-  if (!listing) return undefined;
-  listing.status = decision;
-  listing.reviewedAt = new Date().toISOString();
-  await writeAll(all);
-  return listing;
+  const { data, error } = await supabase
+    .from("listings")
+    .update({ status: decision, reviewed_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(`Failed to update listing: ${error.message}`);
+  return data ? rowToListing(data as ListingRow) : undefined;
 }
