@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Header from "@/components/Header";
-import { CATEGORIES } from "@/lib/data";
+import { CATEGORIES } from "@/lib/types";
 import type { Category } from "@/lib/types";
 
 export default function ListYourBusinessPage() {
